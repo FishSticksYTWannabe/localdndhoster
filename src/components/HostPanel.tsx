@@ -7,11 +7,36 @@ interface Campaign {
   notes: string;
 }
 
+type PlayerPrivilege = {
+  canJoin: boolean;
+  canUseChat: boolean;
+  canUseVTT: boolean;
+  canPlaceTokens: boolean;
+};
+
+interface PlayerProfile {
+  id: string;
+  name: string;
+  privileges: PlayerPrivilege;
+}
+
 const electron = (window as any).require?.('electron');
 const ipcRenderer = electron?.ipcRenderer;
 const os = (window as any).require?.('os');
 
-function HostPanel({ campaign }: { campaign: Campaign | null }) {
+function HostPanel({
+  campaign,
+  playerProfiles,
+  selectedPlayerId,
+  onUpdatePlayer,
+  onSelectPlayer,
+}: {
+  campaign: Campaign | null;
+  playerProfiles: PlayerProfile[];
+  selectedPlayerId: string | null;
+  onUpdatePlayer: (profile: PlayerProfile) => void;
+  onSelectPlayer: (id: string) => void;
+}) {
   const [port, setPort] = useState(campaign?.port ?? 3000);
   const [status, setStatus] = useState('Stopped');
   const [clients, setClients] = useState(0);
@@ -179,6 +204,21 @@ function HostPanel({ campaign }: { campaign: Campaign | null }) {
     setMessage('');
   };
 
+  const selectedPlayer = playerProfiles.find((player) => player.id === selectedPlayerId);
+
+  const togglePrivilege = (playerId: string, key: keyof PlayerPrivilege) => {
+    const player = playerProfiles.find((profile) => profile.id === playerId);
+    if (!player) return;
+    const updated: PlayerProfile = {
+      ...player,
+      privileges: {
+        ...player.privileges,
+        [key]: !player.privileges[key],
+      },
+    };
+    onUpdatePlayer(updated);
+  };
+
   return (
     <section className="panel section">
       <div className="panel-grid">
@@ -220,6 +260,50 @@ function HostPanel({ campaign }: { campaign: Campaign | null }) {
           </div>
         </div>
 
+        <div className="panel-card wide-card">
+          <h2>Player Privileges</h2>
+          <p>As DM, select a player and toggle the features they can use in session.</p>
+          {playerProfiles.length === 0 ? (
+            <div className="log-empty">No players created yet. Add them from the Launcher.</div>
+          ) : (
+            <div className="version-list">
+              {playerProfiles.map((profile) => (
+                <div key={profile.id} className={`version-item ${selectedPlayerId === profile.id ? 'selected-player' : ''}`}>
+                  <div>
+                    <strong>{profile.name}</strong>
+                    <div className="small-text">Tap to select and adjust privileges.</div>
+                  </div>
+                  <div className="version-actions">
+                    <button onClick={() => onSelectPlayer(profile.id)}>{selectedPlayerId === profile.id ? 'Selected' : 'Select'}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {selectedPlayer ? (
+            <div className="privilege-panel">
+              <h3>{selectedPlayer.name}</h3>
+              <div className="privilege-grid">
+                {Object.entries(selectedPlayer.privileges).map(([key, enabled]) => (
+                  <button
+                    key={key}
+                    className={enabled ? 'privilege-toggle active' : 'privilege-toggle'}
+                    onClick={() => togglePrivilege(selectedPlayer.id, key as keyof PlayerPrivilege)}
+                  >
+                    {key.replace(/([A-Z])/g, ' $1')}: {enabled ? 'Enabled' : 'Disabled'}
+                  </button>
+                ))}
+              </div>
+              <div className="small-text">These privilege settings are visible to players when they connect.</div>
+            </div>
+          ) : (
+            <div className="log-empty">Select a player to edit privileges.</div>
+          )}
+        </div>
+      </div>
+
+      <div className="panel-grid">
         <div className="panel-card">
           <h2>Broadcast Message</h2>
           <label>

@@ -24,11 +24,57 @@ interface Campaign {
   notes: string;
 }
 
+type RoleType = 'dm' | 'player' | 'none';
+
+type PlayerPrivilege = {
+  canJoin: boolean;
+  canUseChat: boolean;
+  canUseVTT: boolean;
+  canPlaceTokens: boolean;
+};
+
+interface PlayerProfile {
+  id: string;
+  name: string;
+  privileges: PlayerPrivilege;
+}
+
 const STORAGE_VERSIONS = 'dnd-campaigns';
 const STORAGE_SELECTED = 'dnd-selected-campaign';
+const STORAGE_ROLE = 'dnd-current-role';
+const STORAGE_PLAYERS = 'dnd-player-profiles';
+const STORAGE_SELECTED_PLAYER = 'dnd-selected-player';
 
 function App() {
   const [activeTab, setActiveTab] = useState('launcher');
+  const [role, setRole] = useState<RoleType>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_ROLE);
+      return (raw === 'dm' || raw === 'player' ? raw : 'none') as RoleType;
+    } catch {
+      return 'none';
+    }
+  });
+  const [playerProfiles, setPlayerProfiles] = useState<PlayerProfile[]>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_PLAYERS);
+      if (raw) {
+        return JSON.parse(raw) as PlayerProfile[];
+      }
+    } catch {
+      return [];
+    }
+    return [];
+  });
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_SELECTED_PLAYER);
+      return raw || null;
+    } catch {
+      return null;
+    }
+  });
+
   const [campaigns, setCampaigns] = useState<Campaign[]>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_VERSIONS);
@@ -61,12 +107,27 @@ function App() {
   }, [selectedCampaignId]);
 
   useEffect(() => {
+    localStorage.setItem(STORAGE_ROLE, role);
+  }, [role]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_PLAYERS, JSON.stringify(playerProfiles));
+  }, [playerProfiles]);
+
+  useEffect(() => {
+    if (selectedPlayerId) {
+      localStorage.setItem(STORAGE_SELECTED_PLAYER, selectedPlayerId);
+    }
+  }, [selectedPlayerId]);
+
+  useEffect(() => {
     if (!selectedCampaignId && campaigns.length > 0) {
       setSelectedCampaignId(campaigns[0].id);
     }
   }, [campaigns, selectedCampaignId]);
 
   const selectedCampaign = campaigns.find((campaign) => campaign.id === selectedCampaignId) ?? null;
+  const selectedPlayer = playerProfiles.find((player) => player.id === selectedPlayerId) ?? null;
 
   const addCampaign = (campaign: Campaign) => {
     setCampaigns((current) => [campaign, ...current]);
@@ -82,6 +143,24 @@ function App() {
 
   const selectCampaign = (id: string) => {
     setSelectedCampaignId(id);
+  };
+
+  const setRoleAndTab = (newRole: RoleType) => {
+    setRole(newRole);
+    setActiveTab(newRole === 'dm' ? 'host' : newRole === 'player' ? 'player' : 'launcher');
+  };
+
+  const addPlayerProfile = (profile: PlayerProfile) => {
+    setPlayerProfiles((current) => [profile, ...current]);
+    setSelectedPlayerId(profile.id);
+  };
+
+  const updatePlayerProfile = (updated: PlayerProfile) => {
+    setPlayerProfiles((current) => current.map((player) => (player.id === updated.id ? updated : player)));
+  };
+
+  const selectPlayerProfile = (id: string) => {
+    setSelectedPlayerId(id);
   };
 
   return (
@@ -113,10 +192,24 @@ function App() {
             onSelectVersion={selectCampaign}
             onAddVersion={addCampaign}
             onDeleteVersion={deleteCampaign}
+            role={role}
+            onSelectRole={setRoleAndTab}
+            playerProfiles={playerProfiles}
+            selectedPlayerId={selectedPlayerId}
+            onSelectPlayer={selectPlayerProfile}
+            onCreatePlayer={addPlayerProfile}
           />
         )}
-        {activeTab === 'host' && <HostPanel campaign={selectedCampaign} />}
-        {activeTab === 'player' && <PlayerPanel campaign={selectedCampaign} />}
+        {activeTab === 'host' && (
+          <HostPanel
+            campaign={selectedCampaign}
+            playerProfiles={playerProfiles}
+            selectedPlayerId={selectedPlayerId}
+            onUpdatePlayer={updatePlayerProfile}
+            onSelectPlayer={selectPlayerProfile}
+          />
+        )}
+        {activeTab === 'player' && <PlayerPanel campaign={selectedCampaign} playerProfile={selectedPlayer} />}
         {activeTab === 'builder' && <CharacterBuilder />}
         {activeTab === 'books' && <BooksPanel />}
         {activeTab === 'vtt' && <VTT />}

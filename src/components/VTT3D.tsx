@@ -11,6 +11,14 @@ type Token3D = {
   z: number;
 };
 
+type RollRecord = {
+  id: string;
+  timestamp: string;
+  type: string;
+  value: number;
+  label: string;
+};
+
 const electron = (window as any).require?.('electron');
 const ipcRenderer = electron?.ipcRenderer;
 
@@ -26,6 +34,7 @@ function VTT3D() {
   const [heightmapFile, setHeightmapFile] = useState<File | null>(null);
   const [cellSize, setCellSize] = useState<number>(5);
   const [tokens, setTokens] = useState<Token3D[]>([]);
+  const [rollHistory, setRollHistory] = useState<RollRecord[]>([]);
   const [tokenName, setTokenName] = useState('');
   const [tokenIcon, setTokenIcon] = useState('https://www.svgrepo.com/show/2046/d20.svg');
   const [mode, setMode] = useState<'select' | 'paint' | 'place'>('select');
@@ -41,10 +50,16 @@ function VTT3D() {
   }, [cellSize]);
 
   useEffect(() => {
-    // init tile heights
+    // init tile heights when needed, but preserve existing data if grid size matches
     const total = cols * rows;
-    tileHeightsRef.current = new Array(total).fill(0);
+    if (tileHeightsRef.current.length !== total) {
+      tileHeightsRef.current = new Array(total).fill(0);
+    }
   }, [cols, rows]);
+
+  useEffect(() => {
+    loadVTT();
+  }, []);
 
   useEffect(() => {
     if (!mountRef.current) return;
@@ -167,134 +182,86 @@ function VTT3D() {
     return cleanup;
   }, [cols, rows]);
 
-  // Dice support (d6 implemented with real face orientations)
+  // Dice support (persistent roll history and face mapping)
   const rollStateRef = useRef<{ rolling: boolean; result?: number }>({ rolling: false });
-
-  const makeD6Mesh = () => {
-    const size = Math.min(gridSize / 6, 6);
-    const geom = new THREE.BoxGeometry(size, size, size);
-    const mats = [];
-    // simple numbered faces using canvas textures
-    for (let i = 1; i <= 6; i++) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 256;
-      canvas.height = 256;
-      const ctx = canvas.getContext('2d')!;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 140px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(String(i), canvas.width / 2, canvas.height / 2 + 10);
-      const tex = new THREE.CanvasTexture(canvas);
-      mats.push(new THREE.MeshStandardMaterial({ map: tex }));
-    }
-    const mesh = new THREE.Mesh(geom, mats);
-    return mesh;
-  };
 
   const getDiceGroup = () => {
     return (sceneRef.current as any)?._diceGroup as THREE.Group | undefined;
   };
 
-  const faceNormalForD6 = (faceIndex: number) => {
-    // mapping 1..6 -> normals in local box coordinates
-    const normals = [
-      new THREE.Vector3(0, 1, 0), // 1 -> +Y
-      new THREE.Vector3(0, -1, 0), // 2 -> -Y
-      new THREE.Vector3(1, 0, 0), // 3 -> +X
-      new THREE.Vector3(-1, 0, 0), // 4 -> -X
-      new THREE.Vector3(0, 0, 1), // 5 -> +Z
-      new THREE.Vector3(0, 0, -1), // 6 -> -Z
-    ];
-    return normals[(faceIndex - 1) % 6];
+  const createFaceTexture = (label: string) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 140px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, canvas.width / 2, canvas.height / 2 + 10);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
   };
 
-  const rollD6 = async () => {
-    if (!sceneRef.current) return Promise.resolve(0);
-    const diceGroup = getDiceGroup();
-    if (!diceGroup) return Promise.resolve(0);
-    // remove existing dice
-    diceGroup.clear();
-    const die = makeD6Mesh();
-    die.position.set(0, 10, 0);
-    diceGroup.add(die);
+  const createFaceMaterials = (labels: string[]) => {
+    return labels.map((label) => new THREE.MeshStandardMaterial({ map: createFaceTexture(label), roughness: 0.4, metalness: 0.1, side: THREE.DoubleSide }));
+  };
 
-    const targetFace = Math.floor(Math.random() * 6) + 1;
-    // compute quaternion so that chosen face normal points up (0,1,0)
-    const normal = faceNormalForD6(targetFace).clone().normalize();
+  const configureGroupsForFaces = (geometry: THREE.BufferGeometry, faceCount: number) => {
+    const index = geometry.index;
+    if (!index) return 1;
+    geometry.clearGroups();
+    const totalTriangles = index.count / 3;
+    const trianglesPerFace = Math.floor(totalTriangles / faceCount);
+    for (let face = 0; face < faceCount; face += 1) {
+      const start = face * trianglesPerFace * 3;
+      const count = face === faceCount - 1 ? index.count - start : trianglesPerFace * 3;
+      geometry.addGroup(start, count, face);
+    }
+    return Math.max(1, trianglesPerFace);
+  };
+
+  const computeFaceNormals = (geometry: THREE.BufferGeometry, faceCount: number) => {
+    const normals: THREE.Vector3[] = [];
+    const position = geometry.attributes.position;
+    const index = geometry.index;
+    if (!index) return normals;
+    if (geometry.groups.length === 0) {
+      configureGroupsForFaces(geometry, faceCount);
+    }
+    for (let groupIndex = 0; groupIndex < geometry.groups.length; groupIndex += 1) {
+      const group = geometry.groups[groupIndex];
+      const faceNormal = new THREE.Vector3(0, 0, 0);
+      const triangleCount = group.count / 3;
+      for (let i = group.start; i < group.start + group.count; i += 3) {
+        const i0 = index.array[i];
+        const i1 = index.array[i + 1];
+        const i2 = index.array[i + 2];
+        const a = new THREE.Vector3().fromBufferAttribute(position, i0);
+        const b = new THREE.Vector3().fromBufferAttribute(position, i1);
+        const c = new THREE.Vector3().fromBufferAttribute(position, i2);
+        const triNormal = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
+        faceNormal.add(triNormal);
+      }
+      faceNormal.normalize();
+      normals.push(faceNormal);
+    }
+    return normals;
+  };
+
+  const orientDieToFace = (mesh: THREE.Mesh, faceIndex: number, normals: THREE.Vector3[]) => {
+    if (!normals[faceIndex]) return;
+    const normal = normals[faceIndex].clone().normalize();
     const up = new THREE.Vector3(0, 1, 0);
-    const q = new THREE.Quaternion().setFromUnitVectors(normal, up);
-
-    // add some random spin
-    const extra = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6));
-    const finalQ = q.multiply(extra);
-
-    // animate slerp
-    const duration = 1000;
-    const startQ = die.quaternion.clone();
-    const start = performance.now();
-    return new Promise<number>((resolve) => {
-      function animate(now: number) {
-        const t = Math.min(1, (now - start) / duration);
-        const tmp = startQ.clone().slerp(finalQ, t);
-        die.quaternion.copy(tmp);
-        if (t < 1) {
-          requestAnimationFrame(animate);
-        } else {
-          rollStateRef.current = { rolling: false, result: targetFace };
-          resolve(targetFace);
-        }
-      }
-      rollStateRef.current = { rolling: true };
-      requestAnimationFrame(animate);
-    });
+    const faceQuat = new THREE.Quaternion().setFromUnitVectors(normal, up);
+    const randomSpin = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.random() * Math.PI * 2, 0));
+    mesh.quaternion.copy(faceQuat.multiply(randomSpin));
   };
 
-  const rollD20 = async () => {
-    // d20: simulate numeric roll and show spinning icosahedron (no face-number mapping)
-    if (!sceneRef.current) return Promise.resolve(0);
-    const diceGroup = getDiceGroup();
-    if (!diceGroup) return Promise.resolve(0);
-    diceGroup.clear();
-    const geom = new THREE.IcosahedronGeometry(4, 0);
-    const mat = new THREE.MeshStandardMaterial({ color: 0xffdd66 });
-    const mesh = new THREE.Mesh(geom, mat);
-    mesh.position.set(0, 10, 0);
-    diceGroup.add(mesh);
-    const result = Math.floor(Math.random() * 20) + 1;
-    const duration = 1000;
-    const startQ = mesh.quaternion.clone();
-    const extra = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 8, Math.random() * 8, Math.random() * 8));
-    const finalQ = extra;
-    const start = performance.now();
-    return new Promise<number>((resolve) => {
-      function animate(now: number) {
-        const t = Math.min(1, (now - start) / duration);
-        const tmp = startQ.clone().slerp(finalQ, t);
-        mesh.quaternion.copy(tmp);
-        if (t < 1) requestAnimationFrame(animate);
-        else {
-          resolve(result);
-        }
-      }
-      requestAnimationFrame(animate);
-    });
-  };
-
-  const [lastRoll, setLastRoll] = useState<string | null>(null);
-
-  const doRoll = async (type: 'd6' | 'd20') => {
-    setLastRoll('Rolling...');
-    let res = 0;
-    if (type === 'd6') res = await rollD6();
-    else res = await rollD20();
-    setLastRoll(`${type}: ${res}`);
-  };
-
-  // Generic die factory and roller for d4,d8,d12 and d10 (approx) and d100
-  const makeDieMeshFor = (type: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20') => {
+  const makeDieMeshFor = (type: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20', labels: string[]) => {
     const size = Math.min(gridSize / 6, 6);
     let geom: THREE.BufferGeometry;
     switch (type) {
@@ -315,14 +282,31 @@ function VTT3D() {
         break;
       case 'd10':
       default:
-        // approximate d10 with a cylinder-like 10-segment prism
-        geom = new THREE.CylinderGeometry(size * 0.6, size * 0.6, size * 1.2, 10);
+        geom = new THREE.CylinderGeometry(size * 0.6, size * 0.6, size * 1.2, 10, 1, true);
         break;
     }
-    const mat = new THREE.MeshStandardMaterial({ color: 0xffdd66 });
-    const mesh = new THREE.Mesh(geom, mat);
+    configureGroupsForFaces(geom, labels.length);
+    const mats = createFaceMaterials(labels);
+    const mesh = new THREE.Mesh(geom, mats);
     mesh.castShadow = true;
-    return mesh;
+    return { mesh, faceNormals: computeFaceNormals(geom, labels.length) };
+  };
+
+  const [lastRoll, setLastRoll] = useState<string | null>(null);
+
+  const saveRoll = async (type: string, value: number) => {
+    const record: RollRecord = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      type,
+      value,
+      label: `${type}: ${value}`,
+    };
+    setRollHistory((prev) => {
+      const next = [record, ...prev];
+      saveVTT({ rollHistory: next });
+      return next;
+    });
   };
 
   const rollGeneric = async (type: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100') => {
@@ -330,56 +314,57 @@ function VTT3D() {
     const diceGroup = getDiceGroup();
     if (!diceGroup) return 0;
     diceGroup.clear();
-    // for d100, roll two d10
-    if (type === 'd100') {
-      const a = Math.floor(Math.random() * 10);
-      const b = Math.floor(Math.random() * 10);
-      const value = (a === 0 ? 10 : a) * 10 + (b === 0 ? 10 : b);
-      // show a d10-ish mesh
-      const mesh = makeDieMeshFor('d10');
-      mesh.position.set(0, 10, 0);
+
+    const rollDie = async (dieType: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20', labels: string[], faceIndex: number, positionX = 0) => {
+      const { mesh, faceNormals } = makeDieMeshFor(dieType, labels);
+      mesh.position.set(positionX, 10, 0);
+      orientDieToFace(mesh, faceIndex, faceNormals);
       diceGroup.add(mesh);
-      // animate
       const startQ = mesh.quaternion.clone();
-      const extra = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 8, Math.random() * 8, Math.random() * 8));
-      const finalQ = extra;
+      const finalQ = mesh.quaternion.clone();
       const start = performance.now();
-      const duration = 900;
-      return new Promise<number>((resolve) => {
+      const duration = 1000;
+      return new Promise<void>((resolve) => {
         function animate(now: number) {
           const t = Math.min(1, (now - start) / duration);
           const tmp = startQ.clone().slerp(finalQ, t);
           mesh.quaternion.copy(tmp);
           if (t < 1) requestAnimationFrame(animate);
-          else resolve(value);
+          else resolve();
         }
         requestAnimationFrame(animate);
       });
+    };
+
+    const getLabels = (count: number, startAtOne = true) => {
+      return Array.from({ length: count }, (_, idx) => String(startAtOne ? idx + 1 : idx));
+    };
+
+    if (type === 'd100') {
+      const tens = Math.floor(Math.random() * 10);
+      const ones = Math.floor(Math.random() * 10);
+      const value = tens === 0 && ones === 0 ? 100 : tens * 10 + ones;
+      const tensLabels = Array.from({ length: 10 }, (_, idx) => (idx === 0 ? '00' : `${idx * 10}`));
+      const onesLabels = Array.from({ length: 10 }, (_, idx) => `${idx}`);
+      await rollDie('d10', tensLabels, tens, -8);
+      await rollDie('d10', onesLabels, ones, 8);
+      return value;
     }
 
-    const mesh = makeDieMeshFor(type === 'd10' ? 'd10' : (type as any));
-    mesh.position.set(0, 10, 0);
-    diceGroup.add(mesh);
-    const resultMax = type === 'd4' ? 4 : type === 'd6' ? 6 : type === 'd8' ? 8 : type === 'd12' ? 12 : type === 'd20' ? 20 : type === 'd10' ? 10 : 6;
-    const result = Math.floor(Math.random() * resultMax) + 1;
-    const startQ = mesh.quaternion.clone();
-    const extra = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6));
-    const finalQ = extra;
-    const start = performance.now();
-    const duration = 800;
-    return new Promise<number>((resolve) => {
-      function animate(now: number) {
-        const t = Math.min(1, (now - start) / duration);
-        const tmp = startQ.clone().slerp(finalQ, t);
-        mesh.quaternion.copy(tmp);
-        if (t < 1) requestAnimationFrame(animate);
-        else resolve(result);
-      }
-      requestAnimationFrame(animate);
-    });
+    const faceCounts = { d4: 4, d6: 6, d8: 8, d10: 10, d12: 12, d20: 20 } as const;
+    const count = faceCounts[type];
+    const labels = getLabels(count, true);
+    const resultIndex = Math.floor(Math.random() * count);
+    await rollDie(type, labels, resultIndex, 0);
+    return resultIndex + 1;
   };
 
-  // helper: tile index from world position
+  const doRoll = async (type: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100') => {
+    setLastRoll('Rolling...');
+    const res = await rollGeneric(type);
+    setLastRoll(`${type}: ${res}`);
+    await saveRoll(type, res);
+  };
   const tileIndexFromWorld = (x: number, z: number) => {
     const half = gridSize / 2;
     const localX = x + half; // 0..gridSize
@@ -461,13 +446,14 @@ function VTT3D() {
     updateTileVisuals(selectedTiles);
   };
 
-  const saveVTT = async () => {
+  const saveVTT = async (override?: { rollHistory?: RollRecord[] }) => {
     const payload = {
       cellSize,
       cols,
       rows,
       tileHeights: tileHeightsRef.current,
       tokens,
+      rollHistory: override?.rollHistory ?? rollHistory,
     };
     if (ipcRenderer) await ipcRenderer.invoke('vtt:save', payload);
   };
@@ -482,6 +468,7 @@ function VTT3D() {
         tileHeightsRef.current = data.tileHeights;
       }
       if (data.tokens) setTokens(data.tokens);
+      if (data.rollHistory) setRollHistory(data.rollHistory);
       updateTileVisuals(new Set());
     }
   };
@@ -538,8 +525,8 @@ function VTT3D() {
           </div>
 
           <div style={{ marginTop: 12 }}>
-            <button onClick={saveVTT}>Save VTT</button>
-            <button onClick={loadVTT}>Load VTT</button>
+            <button onClick={() => saveVTT()}>Save VTT</button>
+            <button onClick={() => loadVTT()}>Load VTT</button>
           </div>
         </div>
 
@@ -558,14 +545,35 @@ function VTT3D() {
       <div style={{ padding: 8 }}>
         <h4>Dice</h4>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d4').then((v) => setLastRoll(`d4: ${v}`)); }}>d4</button>
-          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d6').then((v) => setLastRoll(`d6: ${v}`)); }}>d6</button>
-          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d8').then((v) => setLastRoll(`d8: ${v}`)); }}>d8</button>
-          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d10').then((v) => setLastRoll(`d10: ${v}`)); }}>d10</button>
-          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d12').then((v) => setLastRoll(`d12: ${v}`)); }}>d12</button>
-          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d20').then((v) => setLastRoll(`d20: ${v}`)); }}>d20</button>
-          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d100').then((v) => setLastRoll(`d100: ${v}`)); }}>d100</button>
+          <button onClick={() => doRoll('d4')}>d4</button>
+          <button onClick={() => doRoll('d6')}>d6</button>
+          <button onClick={() => doRoll('d8')}>d8</button>
+          <button onClick={() => doRoll('d10')}>d10</button>
+          <button onClick={() => doRoll('d12')}>d12</button>
+          <button onClick={() => doRoll('d20')}>d20</button>
+          <button onClick={() => doRoll('d100')}>d100</button>
           <div style={{ marginLeft: 12, minWidth: 160 }}>{lastRoll ?? 'No roll yet'}</div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <h5>Roll History</h5>
+          <div style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid #444', padding: 8, borderRadius: 4, background: '#111' }}>
+            {rollHistory.length === 0 ? (
+              <div style={{ color: '#888' }}>No rolls yet. Rolls persist with VTT save/load.</div>
+            ) : (
+              rollHistory.map((record) => (
+                <div key={record.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span>{new Date(record.timestamp).toLocaleString()} · {record.label}</span>
+                  <span>{record.value}</span>
+                </div>
+              ))
+            )}
+          </div>
+          <button style={{ marginTop: 8 }} onClick={() => {
+            setRollHistory([]);
+            saveVTT({ rollHistory: [] });
+          }}>
+            Clear Roll History
+          </button>
         </div>
       </div>
     </section>

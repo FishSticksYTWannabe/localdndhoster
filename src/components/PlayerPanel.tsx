@@ -7,7 +7,20 @@ interface Campaign {
   notes: string;
 }
 
-function PlayerPanel({ campaign }: { campaign: Campaign | null }) {
+type PlayerPrivilege = {
+  canJoin: boolean;
+  canUseChat: boolean;
+  canUseVTT: boolean;
+  canPlaceTokens: boolean;
+};
+
+interface PlayerProfile {
+  id: string;
+  name: string;
+  privileges: PlayerPrivilege;
+}
+
+function PlayerPanel({ campaign, playerProfile }: { campaign: Campaign | null; playerProfile: PlayerProfile | null }) {
   const [host, setHost] = useState('ws://localhost');
   const [port, setPort] = useState(campaign?.port ?? 3000);
   const [relayUrl, setRelayUrl] = useState('ws://localhost:4000/ws');
@@ -17,6 +30,11 @@ function PlayerPanel({ campaign }: { campaign: Campaign | null }) {
   const [log, setLog] = useState<string[]>([]);
   const [message, setMessage] = useState('');
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [privileges, setPrivileges] = useState<PlayerPrivilege | null>(playerProfile?.privileges ?? null);
+
+  useEffect(() => {
+    setPrivileges(playerProfile?.privileges ?? null);
+  }, [playerProfile]);
 
   useEffect(() => {
     if (campaign?.port) {
@@ -41,6 +59,14 @@ function PlayerPanel({ campaign }: { campaign: Campaign | null }) {
     }
 
     const url = useRemoteRelay ? `${relayUrl}?room=${encodeURIComponent(relayRoom)}` : `${host}:${port}`;
+    if (useRemoteRelay && privileges && !privileges.canJoin) {
+      setLog((prev) => ['You do not have permission to join via remote relay.', ...prev]);
+      return;
+    }
+    if (!useRemoteRelay && privileges && !privileges.canJoin) {
+      setLog((prev) => ['You do not have permission to join this game.', ...prev]);
+      return;
+    }
     const ws = new WebSocket(url);
 
     ws.onopen = () => {
@@ -103,6 +129,21 @@ function PlayerPanel({ campaign }: { campaign: Campaign | null }) {
               <div className="small-text">Default port and room loaded from launcher.</div>
             </div>
           ) : null}
+          {playerProfile ? (
+            <div className="status-box">
+              <strong>Player:</strong> {playerProfile.name}
+              <div className="small-text">Enabled features:</div>
+              <div className="privilege-tags">
+                {Object.entries(playerProfile.privileges).map(([key, enabled]) => (
+                  <span key={key} className={enabled ? 'tag tag-enabled' : 'tag tag-disabled'}>
+                    {key.replace(/([A-Z])/g, ' $1')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="log-empty">No player selected. Select one in Launcher to see your privileges.</div>
+          )}
           <label>
             Use remote relay
             <input type="checkbox" checked={useRemoteRelay} onChange={(event) => setUseRemoteRelay(event.target.checked)} />

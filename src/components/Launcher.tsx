@@ -1,18 +1,58 @@
 import { useMemo, useState } from 'react';
 
+type RoleType = 'dm' | 'player';
+
+type PlayerPrivilege = {
+  canJoin: boolean;
+  canUseChat: boolean;
+  canUseVTT: boolean;
+  canPlaceTokens: boolean;
+};
+
+interface PlayerProfile {
+  id: string;
+  name: string;
+  privileges: PlayerPrivilege;
+}
+
 interface LauncherProps {
   versions: { id: string; name: string; port: number; notes: string }[];
   selectedVersionId: string | null;
+  role: RoleType | 'none';
+  playerProfiles: PlayerProfile[];
+  selectedPlayerId: string | null;
   onSelectVersion: (id: string) => void;
   onAddVersion: (version: { id: string; name: string; port: number; notes: string }) => void;
   onDeleteVersion: (id: string) => void;
+  onSelectRole: (role: RoleType) => void;
+  onCreatePlayer: (profile: PlayerProfile) => void;
+  onSelectPlayer: (id: string) => void;
 }
 
-function Launcher({ versions, selectedVersionId, onSelectVersion, onAddVersion, onDeleteVersion }: LauncherProps) {
+const defaultPrivileges: PlayerPrivilege = {
+  canJoin: true,
+  canUseChat: true,
+  canUseVTT: true,
+  canPlaceTokens: false,
+};
+
+function Launcher({
+  versions,
+  selectedVersionId,
+  role,
+  playerProfiles,
+  selectedPlayerId,
+  onSelectVersion,
+  onAddVersion,
+  onDeleteVersion,
+  onSelectRole,
+  onCreatePlayer,
+  onSelectPlayer,
+}: LauncherProps) {
   const [name, setName] = useState('Default Game');
   const [port, setPort] = useState(3000);
   const [notes, setNotes] = useState('Homebrew campaign with maps, tokens and quick host/player launcher');
-
+  const [playerName, setPlayerName] = useState('New Player');
   const selectedVersion = useMemo(
     () => versions.find((version) => version.id === selectedVersionId) ?? null,
     [versions, selectedVersionId],
@@ -25,12 +65,34 @@ function Launcher({ versions, selectedVersionId, onSelectVersion, onAddVersion, 
     setNotes('');
   };
 
+  const addPlayer = () => {
+    const profile: PlayerProfile = {
+      id: `${Date.now()}`,
+      name: playerName.trim() || 'Player',
+      privileges: { ...defaultPrivileges },
+    };
+    onCreatePlayer(profile);
+    setPlayerName('New Player');
+  };
+
   return (
     <section className="panel section">
       <div className="panel-grid">
         <div className="panel-card">
-          <h2>Launcher</h2>
-          <p>Create and switch between saved game versions or campaigns.</p>
+          <div className="launcher-header">
+            <div>
+              <h2>Launcher</h2>
+              <p>Pick whether you're running the DM or joining as a player.</p>
+            </div>
+            <div className="role-pill-group">
+              <button className={role === 'dm' ? 'pill active' : 'pill'} onClick={() => onSelectRole('dm')}>
+                Dungeon Master
+              </button>
+              <button className={role === 'player' ? 'pill active' : 'pill'} onClick={() => onSelectRole('player')}>
+                Player
+              </button>
+            </div>
+          </div>
 
           <label>
             Campaign name
@@ -50,24 +112,32 @@ function Launcher({ versions, selectedVersionId, onSelectVersion, onAddVersion, 
           <button onClick={addVersion}>Create Campaign</button>
         </div>
 
-        <div className="panel-card">
-          <h2>Saved Campaigns</h2>
-          {versions.length === 0 ? (
-            <div className="log-empty">No campaigns yet. Create one here.</div>
+        <div className="panel-card wide-card">
+          <h2>Players & Privileges</h2>
+          <p>DMs can add players and grant or revoke player privileges from here.</p>
+          <div className="player-add-row">
+            <input value={playerName} onChange={(event) => setPlayerName(event.target.value)} placeholder="New player name" />
+            <button onClick={addPlayer}>Create Profile</button>
+          </div>
+          {playerProfiles.length === 0 ? (
+            <div className="log-empty">No player profiles yet.</div>
           ) : (
             <div className="version-list">
-              {versions.map((version) => (
-                <div key={version.id} className="version-item">
+              {playerProfiles.map((profile) => (
+                <div key={profile.id} className={`version-item ${selectedPlayerId === profile.id ? 'selected-player' : ''}`}>
                   <div>
-                    <strong>{version.name}</strong>
-                    <div className="small-text">Port: {version.port}</div>
-                    <div className="small-text">{version.notes}</div>
+                    <strong>{profile.name}</strong>
+                    <div className="small-text">Privileges:</div>
+                    <div className="privilege-tags">
+                      {Object.entries(profile.privileges).map(([key, enabled]) => (
+                        <span key={key} className={enabled ? 'tag tag-enabled' : 'tag tag-disabled'}>
+                          {key.replace(/([A-Z])/g, ' $1')}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                   <div className="version-actions">
-                    <button onClick={() => onSelectVersion(version.id)}>{selectedVersion?.id === version.id ? 'Selected' : 'Select'}</button>
-                    <button className="danger" onClick={() => onDeleteVersion(version.id)}>
-                      Delete
-                    </button>
+                    <button onClick={() => onSelectPlayer(profile.id)}>{selectedPlayerId === profile.id ? 'Selected' : 'Select'}</button>
                   </div>
                 </div>
               ))}
@@ -77,13 +147,15 @@ function Launcher({ versions, selectedVersionId, onSelectVersion, onAddVersion, 
       </div>
 
       <div className="log-panel">
-        <h3>Active Campaign</h3>
+        <h3>Active Session</h3>
         {selectedVersion ? (
           <div className="log-item">
             <p>
               <strong>{selectedVersion.name}</strong> (port {selectedVersion.port})
             </p>
             <p>{selectedVersion.notes}</p>
+            <p className="small-text">Selected role: {role === 'none' ? 'None' : role === 'dm' ? 'Dungeon Master' : 'Player'}</p>
+            {selectedPlayerId ? <p className="small-text">Selected player: {playerProfiles.find((p) => p.id === selectedPlayerId)?.name}</p> : null}
           </div>
         ) : (
           <div className="log-empty">No campaign selected. Pick one to auto-fill host/player settings.</div>
