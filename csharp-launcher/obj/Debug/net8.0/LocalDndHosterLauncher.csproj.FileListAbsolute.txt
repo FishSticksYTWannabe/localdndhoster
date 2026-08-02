@@ -1,0 +1,15 @@
+/workspaces/localdndhoster/csharp-launcher/bin/Debug/net8.0/LocalDndHosterLauncher
+/workspaces/localdndhoster/csharp-launcher/bin/Debug/net8.0/LocalDndHosterLauncher.deps.json
+/workspaces/localdndhoster/csharp-launcher/bin/Debug/net8.0/LocalDndHosterLauncher.runtimeconfig.json
+/workspaces/localdndhoster/csharp-launcher/bin/Debug/net8.0/LocalDndHosterLauncher.dll
+/workspaces/localdndhoster/csharp-launcher/bin/Debug/net8.0/LocalDndHosterLauncher.pdb
+/workspaces/localdndhoster/csharp-launcher/obj/Debug/net8.0/LocalDndHosterLauncher.GeneratedMSBuildEditorConfig.editorconfig
+/workspaces/localdndhoster/csharp-launcher/obj/Debug/net8.0/LocalDndHosterLauncher.AssemblyInfoInputs.cache
+/workspaces/localdndhoster/csharp-launcher/obj/Debug/net8.0/LocalDndHosterLauncher.AssemblyInfo.cs
+/workspaces/localdndhoster/csharp-launcher/obj/Debug/net8.0/LocalDndHosterLauncher.csproj.CoreCompileInputs.cache
+/workspaces/localdndhoster/csharp-launcher/obj/Debug/net8.0/LocalDndHosterLauncher.sourcelink.json
+/workspaces/localdndhoster/csharp-launcher/obj/Debug/net8.0/LocalDndHosterLauncher.dll
+/workspaces/localdndhoster/csharp-launcher/obj/Debug/net8.0/refint/LocalDndHosterLauncher.dll
+/workspaces/localdndhoster/csharp-launcher/obj/Debug/net8.0/LocalDndHosterLauncher.pdb
+/workspaces/localdndhoster/csharp-launcher/obj/Debug/net8.0/LocalDndHosterLauncher.genruntimeconfig.cache
+/workspaces/localdndhoster/csharp-launcher/obj/Debug/net8.0/ref/LocalDndHosterLauncher.dll
