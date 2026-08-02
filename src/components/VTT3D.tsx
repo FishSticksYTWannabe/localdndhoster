@@ -293,6 +293,92 @@ function VTT3D() {
     setLastRoll(`${type}: ${res}`);
   };
 
+  // Generic die factory and roller for d4,d8,d12 and d10 (approx) and d100
+  const makeDieMeshFor = (type: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20') => {
+    const size = Math.min(gridSize / 6, 6);
+    let geom: THREE.BufferGeometry;
+    switch (type) {
+      case 'd4':
+        geom = new THREE.TetrahedronGeometry(size * 0.9);
+        break;
+      case 'd6':
+        geom = new THREE.BoxGeometry(size, size, size);
+        break;
+      case 'd8':
+        geom = new THREE.OctahedronGeometry(size * 0.9);
+        break;
+      case 'd12':
+        geom = new THREE.DodecahedronGeometry(size * 0.9);
+        break;
+      case 'd20':
+        geom = new THREE.IcosahedronGeometry(size * 0.9);
+        break;
+      case 'd10':
+      default:
+        // approximate d10 with a cylinder-like 10-segment prism
+        geom = new THREE.CylinderGeometry(size * 0.6, size * 0.6, size * 1.2, 10);
+        break;
+    }
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffdd66 });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.castShadow = true;
+    return mesh;
+  };
+
+  const rollGeneric = async (type: 'd4' | 'd6' | 'd8' | 'd10' | 'd12' | 'd20' | 'd100') => {
+    if (!sceneRef.current) return 0;
+    const diceGroup = getDiceGroup();
+    if (!diceGroup) return 0;
+    diceGroup.clear();
+    // for d100, roll two d10
+    if (type === 'd100') {
+      const a = Math.floor(Math.random() * 10);
+      const b = Math.floor(Math.random() * 10);
+      const value = (a === 0 ? 10 : a) * 10 + (b === 0 ? 10 : b);
+      // show a d10-ish mesh
+      const mesh = makeDieMeshFor('d10');
+      mesh.position.set(0, 10, 0);
+      diceGroup.add(mesh);
+      // animate
+      const startQ = mesh.quaternion.clone();
+      const extra = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 8, Math.random() * 8, Math.random() * 8));
+      const finalQ = extra;
+      const start = performance.now();
+      const duration = 900;
+      return new Promise<number>((resolve) => {
+        function animate(now: number) {
+          const t = Math.min(1, (now - start) / duration);
+          const tmp = startQ.clone().slerp(finalQ, t);
+          mesh.quaternion.copy(tmp);
+          if (t < 1) requestAnimationFrame(animate);
+          else resolve(value);
+        }
+        requestAnimationFrame(animate);
+      });
+    }
+
+    const mesh = makeDieMeshFor(type === 'd10' ? 'd10' : (type as any));
+    mesh.position.set(0, 10, 0);
+    diceGroup.add(mesh);
+    const resultMax = type === 'd4' ? 4 : type === 'd6' ? 6 : type === 'd8' ? 8 : type === 'd12' ? 12 : type === 'd20' ? 20 : type === 'd10' ? 10 : 6;
+    const result = Math.floor(Math.random() * resultMax) + 1;
+    const startQ = mesh.quaternion.clone();
+    const extra = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6));
+    const finalQ = extra;
+    const start = performance.now();
+    const duration = 800;
+    return new Promise<number>((resolve) => {
+      function animate(now: number) {
+        const t = Math.min(1, (now - start) / duration);
+        const tmp = startQ.clone().slerp(finalQ, t);
+        mesh.quaternion.copy(tmp);
+        if (t < 1) requestAnimationFrame(animate);
+        else resolve(result);
+      }
+      requestAnimationFrame(animate);
+    });
+  };
+
   // helper: tile index from world position
   const tileIndexFromWorld = (x: number, z: number) => {
     const half = gridSize / 2;
@@ -471,10 +557,15 @@ function VTT3D() {
       </div>
       <div style={{ padding: 8 }}>
         <h4>Dice</h4>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button onClick={() => doRoll('d6')}>Roll d6</button>
-          <button onClick={() => doRoll('d20')}>Roll d20</button>
-          <div style={{ marginLeft: 12 }}>{lastRoll ?? 'No roll yet'}</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d4').then((v) => setLastRoll(`d4: ${v}`)); }}>d4</button>
+          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d6').then((v) => setLastRoll(`d6: ${v}`)); }}>d6</button>
+          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d8').then((v) => setLastRoll(`d8: ${v}`)); }}>d8</button>
+          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d10').then((v) => setLastRoll(`d10: ${v}`)); }}>d10</button>
+          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d12').then((v) => setLastRoll(`d12: ${v}`)); }}>d12</button>
+          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d20').then((v) => setLastRoll(`d20: ${v}`)); }}>d20</button>
+          <button onClick={() => { setLastRoll('Rolling...'); rollGeneric('d100').then((v) => setLastRoll(`d100: ${v}`)); }}>d100</button>
+          <div style={{ marginLeft: 12, minWidth: 160 }}>{lastRoll ?? 'No roll yet'}</div>
         </div>
       </div>
     </section>
