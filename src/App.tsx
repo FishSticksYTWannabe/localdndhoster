@@ -5,6 +5,7 @@ import CharacterBuilder from './components/CharacterBuilder';
 import Launcher from './components/Launcher';
 import VTT from './components/VTT';
 import BooksPanel from './components/BooksPanel';
+import VTT3D from './components/VTT3D';
 
 const tabs = [
   { id: 'launcher', label: 'Launcher' },
@@ -13,6 +14,7 @@ const tabs = [
   { id: 'builder', label: 'Character Builder' },
   { id: 'books', label: 'Books' },
   { id: 'vtt', label: 'VTT' },
+  { id: 'vtt3d', label: 'VTT 3D' },
 ];
 
 interface Campaign {
@@ -118,6 +120,7 @@ function App() {
         {activeTab === 'builder' && <CharacterBuilder />}
         {activeTab === 'books' && <BooksPanel />}
         {activeTab === 'vtt' && <VTT />}
+        {activeTab === 'vtt3d' && <VTT3D />}
       </main>
     </div>
   );
