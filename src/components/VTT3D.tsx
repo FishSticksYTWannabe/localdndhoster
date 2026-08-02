@@ -88,6 +88,12 @@ function VTT3D() {
     tilesRef.current = tilesGroup;
     scene.add(tilesGroup);
 
+    // dice group
+    const diceGroup = new THREE.Group();
+    diceGroup.name = 'diceGroup';
+    scene.add(diceGroup);
+    (scene as any)._diceGroup = diceGroup;
+
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
@@ -160,6 +166,132 @@ function VTT3D() {
 
     return cleanup;
   }, [cols, rows]);
+
+  // Dice support (d6 implemented with real face orientations)
+  const rollStateRef = useRef<{ rolling: boolean; result?: number }>({ rolling: false });
+
+  const makeD6Mesh = () => {
+    const size = Math.min(gridSize / 6, 6);
+    const geom = new THREE.BoxGeometry(size, size, size);
+    const mats = [];
+    // simple numbered faces using canvas textures
+    for (let i = 1; i <= 6; i++) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 140px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(i), canvas.width / 2, canvas.height / 2 + 10);
+      const tex = new THREE.CanvasTexture(canvas);
+      mats.push(new THREE.MeshStandardMaterial({ map: tex }));
+    }
+    const mesh = new THREE.Mesh(geom, mats);
+    return mesh;
+  };
+
+  const getDiceGroup = () => {
+    return (sceneRef.current as any)?._diceGroup as THREE.Group | undefined;
+  };
+
+  const faceNormalForD6 = (faceIndex: number) => {
+    // mapping 1..6 -> normals in local box coordinates
+    const normals = [
+      new THREE.Vector3(0, 1, 0), // 1 -> +Y
+      new THREE.Vector3(0, -1, 0), // 2 -> -Y
+      new THREE.Vector3(1, 0, 0), // 3 -> +X
+      new THREE.Vector3(-1, 0, 0), // 4 -> -X
+      new THREE.Vector3(0, 0, 1), // 5 -> +Z
+      new THREE.Vector3(0, 0, -1), // 6 -> -Z
+    ];
+    return normals[(faceIndex - 1) % 6];
+  };
+
+  const rollD6 = async () => {
+    if (!sceneRef.current) return Promise.resolve(0);
+    const diceGroup = getDiceGroup();
+    if (!diceGroup) return Promise.resolve(0);
+    // remove existing dice
+    diceGroup.clear();
+    const die = makeD6Mesh();
+    die.position.set(0, 10, 0);
+    diceGroup.add(die);
+
+    const targetFace = Math.floor(Math.random() * 6) + 1;
+    // compute quaternion so that chosen face normal points up (0,1,0)
+    const normal = faceNormalForD6(targetFace).clone().normalize();
+    const up = new THREE.Vector3(0, 1, 0);
+    const q = new THREE.Quaternion().setFromUnitVectors(normal, up);
+
+    // add some random spin
+    const extra = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6));
+    const finalQ = q.multiply(extra);
+
+    // animate slerp
+    const duration = 1000;
+    const startQ = die.quaternion.clone();
+    const start = performance.now();
+    return new Promise<number>((resolve) => {
+      function animate(now: number) {
+        const t = Math.min(1, (now - start) / duration);
+        const tmp = startQ.clone().slerp(finalQ, t);
+        die.quaternion.copy(tmp);
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          rollStateRef.current = { rolling: false, result: targetFace };
+          resolve(targetFace);
+        }
+      }
+      rollStateRef.current = { rolling: true };
+      requestAnimationFrame(animate);
+    });
+  };
+
+  const rollD20 = async () => {
+    // d20: simulate numeric roll and show spinning icosahedron (no face-number mapping)
+    if (!sceneRef.current) return Promise.resolve(0);
+    const diceGroup = getDiceGroup();
+    if (!diceGroup) return Promise.resolve(0);
+    diceGroup.clear();
+    const geom = new THREE.IcosahedronGeometry(4, 0);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffdd66 });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.set(0, 10, 0);
+    diceGroup.add(mesh);
+    const result = Math.floor(Math.random() * 20) + 1;
+    const duration = 1000;
+    const startQ = mesh.quaternion.clone();
+    const extra = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * 8, Math.random() * 8, Math.random() * 8));
+    const finalQ = extra;
+    const start = performance.now();
+    return new Promise<number>((resolve) => {
+      function animate(now: number) {
+        const t = Math.min(1, (now - start) / duration);
+        const tmp = startQ.clone().slerp(finalQ, t);
+        mesh.quaternion.copy(tmp);
+        if (t < 1) requestAnimationFrame(animate);
+        else {
+          resolve(result);
+        }
+      }
+      requestAnimationFrame(animate);
+    });
+  };
+
+  const [lastRoll, setLastRoll] = useState<string | null>(null);
+
+  const doRoll = async (type: 'd6' | 'd20') => {
+    setLastRoll('Rolling...');
+    let res = 0;
+    if (type === 'd6') res = await rollD6();
+    else res = await rollD20();
+    setLastRoll(`${type}: ${res}`);
+  };
 
   // helper: tile index from world position
   const tileIndexFromWorld = (x: number, z: number) => {
@@ -337,8 +469,17 @@ function VTT3D() {
           </div>
         ))}
       </div>
+      <div style={{ padding: 8 }}>
+        <h4>Dice</h4>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={() => doRoll('d6')}>Roll d6</button>
+          <button onClick={() => doRoll('d20')}>Roll d20</button>
+          <div style={{ marginLeft: 12 }}>{lastRoll ?? 'No roll yet'}</div>
+        </div>
+      </div>
     </section>
   );
 }
 
 export default VTT3D;
+
