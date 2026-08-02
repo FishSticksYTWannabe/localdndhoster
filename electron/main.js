@@ -171,6 +171,29 @@ ipcMain.handle('ai:generate', async (_, { prompt, endpoint }) => {
   }
 });
 
+// VTT persistence
+ipcMain.handle('vtt:save', async (_, payload) => {
+  try {
+    const dataPath = path.join(app.getPath('userData'), 'vtt.json');
+    fs.writeFileSync(dataPath, JSON.stringify(payload, null, 2), 'utf8');
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('vtt:load', async () => {
+  try {
+    const dataPath = path.join(app.getPath('userData'), 'vtt.json');
+    if (!fs.existsSync(dataPath)) return { success: true, data: null };
+    const raw = fs.readFileSync(dataPath, 'utf8');
+    const data = JSON.parse(raw || 'null');
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 app.whenReady().then(() => {
   createWindow();
 
