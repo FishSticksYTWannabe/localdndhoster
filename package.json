@@ -11,10 +11,10 @@
     "preview:web": "vite preview --host 0.0.0.0",
     "start": "electron .",
     "package": "electron-builder",
-    "dist:linux": "electron-builder --linux AppImage deb",
-    "dist:windows": "electron-builder --windows nsis",
+    "dist:linux": "electron-builder --linux AppImage deb tar.gz",
+    "dist:windows": "electron-builder --windows nsis zip",
     "dist:mac": "electron-builder --mac dmg zip",
-    "dist:all": "electron-builder --linux AppImage deb --windows nsis --mac dmg zip"
+    "dist:all": "electron-builder --linux AppImage deb tar.gz --windows nsis zip --mac dmg zip"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -46,10 +46,10 @@
       "buildResources": "build"
     },
     "linux": {
-      "target": ["AppImage", "deb"]
+      "target": ["AppImage", "deb", "tar.gz"]
     },
     "win": {
-      "target": ["nsis"]
+      "target": ["nsis", "zip"]
     },
     "mac": {
       "target": ["dmg", "zip"]
