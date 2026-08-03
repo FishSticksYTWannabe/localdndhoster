@@ -1,18 +1,18 @@
 # localdndhoster
 
-[![Download Latest Release](https://img.shields.io/github/v/release/FishSticksYTWannabe/localdndhoster?label=Download%20Latest)](https://github.com/FishSticksYTWannabe/localdndhoster/releases/latest)
+[![Download Latest Release](https://img.shields.io/github/v/release/FishSticksYTWannabe/localdndhoster?label=Download%20Latest)](https://github.com/FishSticksYTWannabe/localdndhoster/releases/tag/v1.0.1)
 
 LocalDNDHoster is a local LAN-first D&D app with a lightweight Rust server, Go LAN relay, C# launcher, and Electron-based desktop UI.
 
 ## Download executables
 
-Get the latest packaged installers and archives directly from the GitHub Releases page:
+Get the current packaged installers and archives directly from the GitHub release page for v1.0.1:
 
 - Linux: `AppImage`, `deb`
 - Windows: `NSIS` installer
 - macOS: `DMG`, `zip`
 
-🔗 [Download executables from the latest release](https://github.com/FishSticksYTWannabe/localdndhoster/releases/latest)
+🔗 [Download executables from release v1.0.1](https://github.com/FishSticksYTWannabe/localdndhoster/releases/tag/v1.0.1)
 
 ## Architecture
 
