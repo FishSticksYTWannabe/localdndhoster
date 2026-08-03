@@ -1,6 +1,18 @@
 # localdndhoster
 
+[![Download Latest Release](https://img.shields.io/github/v/release/FishSticksYTWannabe/localdndhoster?label=Download%20Latest)](https://github.com/FishSticksYTWannabe/localdndhoster/releases/latest)
+
 LocalDNDHoster is a local LAN-first D&D app with a lightweight Rust server, Go LAN relay, C# launcher, and Electron-based desktop UI.
+
+## Download executables
+
+Get the latest packaged installers and archives directly from the GitHub Releases page:
+
+- Linux: `AppImage`, `deb`
+- Windows: `NSIS` installer
+- macOS: `DMG`, `zip`
+
+🔗 [Download executables from the latest release](https://github.com/FishSticksYTWannabe/localdndhoster/releases/latest)
 
 ## Architecture
 
@@ -11,28 +23,55 @@ LocalDNDHoster is a local LAN-first D&D app with a lightweight Rust server, Go L
 
 ## Getting started
 
-### 1. Electron desktop UI
+### Download executables
+
+For users who want a ready-made app without building from source, provide packaged installers or archives for each platform:
+
+- Linux: `AppImage` and `deb`
+- Windows: `nsis` installer
+- macOS: `dmg` and `zip`
+
+Host the installers in a GitHub release or an assets directory and link them from the project homepage or README.
+
+### Building from source (tech-savvy route)
+
+#### 1. Electron desktop UI
 
 ```bash
 npm install
 npm run dev
 ```
 
-### 2. Rust self-hosted server
+#### 2. Build distributables
+
+```bash
+npm run build
+npm run dist:linux
+npm run dist:windows
+npm run dist:mac
+```
+
+Or build everything at once:
+
+```bash
+npm run dist:all
+```
+
+#### 3. Rust self-hosted server
 
 ```bash
 cd rust-server
 cargo run
 ```
 
-### 3. Go LAN relay
+#### 4. Go LAN relay
 
 ```bash
 cd go-relay
 go run main.go
 ```
 
-### 4. C# launcher
+#### 5. C# launcher
 
 ```bash
 cd csharp-launcher

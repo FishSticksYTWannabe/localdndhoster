@@ -35,6 +35,40 @@ select {
   margin-bottom: 24px;
 }
 
+@media (max-width: 1024px) {
+  .app-shell {
+    padding: 16px;
+  }
+
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-card {
+    padding: 18px;
+  }
+
+  .button-row,
+  .player-add-row,
+  .role-pill-group,
+  .tab-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .button-row button,
+  .tab,
+  .pill,
+  .player-add-row button {
+    width: 100%;
+  }
+}
+
 .app-header h1 {
   margin: 0;
   font-size: clamp(2rem, 2.5vw, 2.6rem);

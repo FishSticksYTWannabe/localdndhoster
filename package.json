@@ -8,8 +8,13 @@
     "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
     "preview": "vite preview",
+    "preview:web": "vite preview --host 0.0.0.0",
     "start": "electron .",
-    "package": "electron-builder"
+    "package": "electron-builder",
+    "dist:linux": "electron-builder --linux AppImage deb",
+    "dist:windows": "electron-builder --windows nsis",
+    "dist:mac": "electron-builder --mac dmg zip",
+    "dist:all": "electron-builder --linux AppImage deb --windows nsis --mac dmg zip"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -39,6 +44,15 @@
     ],
     "directories": {
       "buildResources": "build"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"]
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "mac": {
+      "target": ["dmg", "zip"]
     }
   }
 }

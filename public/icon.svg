@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#2563eb" />
+  <path d="M128 192 L256 96 L384 192 L384 320 L256 416 L128 320 Z" fill="#0f172a" />
+  <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="180" fill="#f8fafc" font-family="Inter, system-ui, sans-serif">D</text>
+</svg>
