@@ -33,6 +33,16 @@ For users who want a ready-made app without building from source, provide packag
 
 Host the installers in a GitHub release or an assets directory and link them from the project homepage or README.
 
+### One-click desktop releases
+
+To make releases easy for non-technical users, this repository now includes a GitHub Actions workflow that builds and publishes desktop app artifacts automatically.
+
+- Create a tag like `v1.0.2` in GitHub and push it
+- GitHub Actions will build installers for Linux, Windows, and macOS
+- The release page will include the packaged files for download
+
+No terminal commands are required for end users.
+
 ### Building from source (tech-savvy route)
 
 #### 1. Electron desktop UI
