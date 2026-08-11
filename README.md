@@ -6,13 +6,22 @@ LocalDNDHoster is a local LAN-first D&D app with a lightweight Rust server, Go L
 
 ## Download executables
 
-Get the current packaged installers and archives directly from the GitHub release page for v1.0.1:
+Get the current packaged installers and archives directly from the GitHub release page for the latest release:
 
-- Linux: `tar.gz`, `AppImage`, `deb`
-- Windows: `.exe` inside `zip`
-- macOS: `DMG`, `zip`
+### Windows
+- Download the `.zip` archive containing the Windows executable
+- Or use the `.exe` installer when available in the release assets
 
-🔗 [Download executables from release v1.0.1](https://github.com/FishSticksYTWannabe/localdndhoster/releases/tag/v1.0.1)
+### Linux
+- Download the `.AppImage` for the easiest setup
+- Or use the `.deb` package for Debian/Ubuntu-based systems
+- A `.tar.gz` archive is also available for manual extraction
+
+### macOS
+- Download the `.dmg` installer for the simplest installation
+- Or use the `.zip` archive if you prefer manual extraction
+
+🔗 [Open the latest GitHub release](https://github.com/FishSticksYTWannabe/localdndhoster/releases/latest)
 
 ## Architecture
 
