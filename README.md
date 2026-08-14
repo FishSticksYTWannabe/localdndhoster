@@ -4,53 +4,50 @@
 
 LocalDNDHoster is a local LAN-first D&D app with a lightweight Rust server, Go LAN relay, C# launcher, and Electron-based desktop UI.
 
-## Download executables
+## Building desktop apps for your platform
 
-Get the current packaged installers and archives directly from the GitHub release page for the latest release:
+### Prerequisites
+- Node.js 20+
+- npm or yarn
 
-### Windows
-- Download the `.zip` archive containing the Windows executable
-- Or use the `.exe` installer when available in the release assets
+### Build steps for all platforms
 
-### Linux
-- Download the `.AppImage` for the easiest setup
-- Or use the `.deb` package for Debian/Ubuntu-based systems
-- A `.tar.gz` archive is also available for manual extraction
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-### macOS
-- Download the `.dmg` installer for the simplest installation
-- Or use the `.zip` archive if you prefer manual extraction
+2. **Build the app**
+   ```bash
+   npm run build
+   ```
 
-🔗 [Open the latest GitHub release](https://github.com/FishSticksYTWannabe/localdndhoster/releases/latest)
+3. **Package for your platform**
 
-## Architecture
+   **Windows:**
+   ```bash
+   npm run dist:windows
+   ```
+   Creates: `.exe` installer and `.zip` archive in `dist/` folder
 
-- `rust-server/` - lightweight Rust WebSocket server for session hosting.
-- `go-relay/` - simple LAN announcer that broadcasts the host address on the local network.
-- `csharp-launcher/` - basic launcher for starting the Rust server and Go relay.
-- `src/` - Electron + React desktop UI for campaign management, host/player controls, character builder, and VTT.
+   **Linux:**
+   ```bash
+   npm run dist:linux
+   ```
+   Creates: `.AppImage`, `.deb`, and `.tar.gz` in `dist/` folder
 
-## Getting started
+   **macOS:**
+   ```bash
+   npm run dist:mac
+   ```
+   Creates: `.dmg` and `.zip` in `dist/` folder
 
-### Download executables
+   **All platforms at once:**
+   ```bash
+   npm run dist:all
+   ```
 
-For users who want a ready-made app without building from source, provide packaged installers or archives for each platform:
-
-- Linux: `AppImage` and `deb`
-- Windows: `nsis` installer
-- macOS: `dmg` and `zip`
-
-Host the installers in a GitHub release or an assets directory and link them from the project homepage or README.
-
-### One-click desktop releases
-
-To make releases easy for non-technical users, this repository now includes a GitHub Actions workflow that builds and publishes desktop app artifacts automatically.
-
-- Create a tag like `v1.0.2` in GitHub and push it
-- GitHub Actions will build installers for Linux, Windows, and macOS
-- The release page will include the packaged files for download
-
-No terminal commands are required for end users.
+The packaged files will be in the `dist/` directory and ready to share or distribute.
 
 ### Building from source (tech-savvy route)
 
@@ -61,41 +58,33 @@ npm install
 npm run dev
 ```
 
-#### 2. Build distributables
-
-```bash
-npm run build
-npm run dist:linux
-npm run dist:windows
-npm run dist:mac
-```
-
-Or build everything at once:
-
-```bash
-npm run dist:all
-```
-
-#### 3. Rust self-hosted server
+#### 2. Rust self-hosted server
 
 ```bash
 cd rust-server
 cargo run
 ```
 
-#### 4. Go LAN relay
+#### 3. Go LAN relay
 
 ```bash
 cd go-relay
 go run main.go
 ```
 
-#### 5. C# launcher
+#### 4. C# launcher
 
 ```bash
 cd csharp-launcher
 dotnet run
 ```
+
+## Architecture
+
+- `rust-server/` - lightweight Rust WebSocket server for session hosting.
+- `go-relay/` - simple LAN announcer that broadcasts the host address on the local network.
+- `csharp-launcher/` - basic launcher for starting the Rust server and Go relay.
+- `src/` - Electron + React desktop UI for campaign management, host/player controls, character builder, and VTT.
 
 ## Features
 
